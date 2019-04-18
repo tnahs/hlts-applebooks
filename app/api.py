@@ -29,12 +29,12 @@ class Api:
         try:
             r = requests.get(self.url_verify, headers=self.headers)
 
+            # API key verified.
             if r.status_code == 200:
-                print("API key verified.")
                 return True
 
+            # Invalid API Key.
             elif r.status_code == 401:
-                print("Invalid API Key.")
                 return False
 
             else:
@@ -43,7 +43,10 @@ class Api:
         except requests.exceptions.ConnectionError:
             raise Exception("Connection Refused: The server is probably down...")
 
-    def sync(self, data: List[dict], method: str) -> Union[bool, Exception]:
+    def post(self, data: List[dict], method: str) -> Union[bool, Exception]:
+        """ TODO: Cleanup up feedback method. This was written to be placed
+        in a try/except block. Are we still going with that?
+        """
 
         if method == "refresh":
             url = self.url_refresh

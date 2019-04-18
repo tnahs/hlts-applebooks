@@ -6,7 +6,6 @@ name = "pypi"
 [packages]
 psutil = "*"
 requests = "*"
-click = "*"
 
 [dev-packages]
 "flake8" = "*"

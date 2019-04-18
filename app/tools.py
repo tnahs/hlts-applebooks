@@ -14,9 +14,13 @@ def applebooks_running() -> bool:
         try:
             pinfo = proc.as_dict(attrs=["name"])
         except psutil.NoSuchProcess:
+            """ When a process doesn't have a name it might mean it's a zombie
+            process which ends up raising a NoSuchProcess exception or its
+            subclass the ZombieProcess exception.
+            """
             pass
         except Exception as error:
-            print(error)
+            raise Exception(error)
 
         if pinfo["name"] == "Books":
             return True
@@ -25,6 +29,7 @@ def applebooks_running() -> bool:
 
 
 class OSTools:
+    """ TODO: Be more explicit with the Exceptions here..."""
 
     def delete_dir(self, path: pathlib.PosixPath) -> None:
 

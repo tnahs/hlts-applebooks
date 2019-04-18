@@ -9,13 +9,38 @@ from .tools import OSTools
 
 
 """
-
-TODO: The way the config is being passed is a bit much, kinda confusing.
-Can we find a cleaner way to pass default variables?
-
 TODO: Build custom exceptions.
-
 """
+
+
+def generate_test_data(amount):
+
+    test_data = []
+
+    for num in range(amount):
+
+        test_data.append(
+            {
+                "id": f"ID-{num}",
+                "passage": f"Test passage #{num}!",
+                "source": {
+                    "name": "Testing Source",
+                    "author": "Testing Author"
+                },
+                "notes": "",
+                "tags": [],
+                "collections": [],
+                "metadata": {
+                    "in_trash": False,
+                    "is_protected": False,
+                    "origin": "testing",
+                    "modified": "",
+                    "created": ""
+                },
+            }
+        )
+
+    return test_data
 
 
 os = OSTools()
@@ -31,17 +56,46 @@ class App():
 
     def run(self):
 
-        self.applebooks = AppleBooks(self.config)
+        # self.applebooks = AppleBooks(self.config)
+        self.api = Api(self.config)
 
-        self.sync()
+        # self.add_annotations()
+        # self.refresh_annotations()
 
-    def sync(self):
+    def add_annotations(self):
 
-        api = Api(self.config)
+        data = generate_test_data(amount=100)
 
-        if api.verify():
-            api.sync(data, "add")
-            print("Syncing annotations...")
+        # data = self.applebooks.adding_annotations
+        chunks = self._chunk_data(data=data, chunk_size=50)
+
+        if self.api.verify():
+            print(f"Adding {len(data)} annotations...")
+            for chunk in chunks:
+                self.api.post(chunk, "add")
+
+    def refresh_annotations(self):
+
+        data = generate_test_data(amount=100)
+
+        # data = self.applebooks.adding_annotations
+        chunks = self._chunk_data(data=data, chunk_size=50)
+
+        if self.api.verify():
+            print(f"Refreshing {len(data)} annotations...")
+            for chunk in chunks:
+                self.api.post(chunk, "refresh")
+
+    def _chunk_data(self, data: list, chunk_size):
+        """ Instead of sending a long list of annotations all at once, this
+        splits the list into a list of `chunk_size` lists. This helps prevent
+        Request Timeouts.
+
+        TODO: We need a non async api url to really test if this works. Right
+        now it works really well with sending 5000 annotations. Not sure if it
+        will work as well without the async url.
+        """
+        return [data[x:x + chunk_size] for x in range(0, len(data), chunk_size)]
 
     def _build_directories(self):
 

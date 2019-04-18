@@ -18,6 +18,12 @@ date = datetime.now().strftime("%Y%m%d")
 os = OSTools()
 
 
+"""
+TODO: The way the config is being passed from AppleBooks to Annotation is kinda
+confusing... Is there a cleaner way we can do that?
+"""
+
+
 class AppleBooks():
 
     def __init__(self, appconfig):
@@ -44,16 +50,16 @@ class AppleBooks():
         """ Merge annotation with source based on "source_id".
         """
 
+        connect = ConnectToAppleBooksDB()
+
+        sources = connect.query_sources()
+        annotations = connect.query_annotations()
+
         self._annotations = []
 
-        query = QueryAppleBooks()
+        for raw_annotation in annotations:
 
-        self._raw_sources = query.all_sources()
-        self._raw_annotations = query.all_annotations()
-
-        for raw_annotation in self._raw_annotations:
-
-            for raw_source in self._raw_sources:
+            for raw_source in sources:
 
                 if raw_annotation["source_id"] == raw_source["id"]:
 
@@ -92,11 +98,11 @@ class AppleBooks():
 
         for annotation in self._annotations:
 
+            books_collections = to_lower(annotation.books_collections)
+
             if annotation.is_skipped:
                 self._skipping.append(annotation)
                 continue
-
-            books_collections = to_lower(annotation.books_collections)
 
             if ignoring_collection in books_collections:
                 self._ignoring.append(annotation)
@@ -162,7 +168,6 @@ class AppleBooks():
         return self.serialize(self._skipping)
 
     def export_to_json(self, directory, filename):
-
         with open(directory / filename, 'w') as f:
             json.dump(self.sorted_annotations, f, sort_keys=True, indent=4, separators=(',', ': '))
 
@@ -321,14 +326,14 @@ class Annotation:
         return data
 
 
-class QueryAppleBooks:
+class ConnectToAppleBooksDB:
 
     def __init__(self):
 
         self.bklibrary_sqlite = self._get_sqlite(path=AppDefaults.bklibrary_dir)
         self.aeannotation_sqlite = self._get_sqlite(path=AppDefaults.aeannotation_dir)
 
-    def all_sources(self):
+    def query_sources(self):
 
         data = self._execute_query(
             sqlite_file=self.bklibrary_sqlite,
@@ -336,7 +341,7 @@ class QueryAppleBooks:
 
         return data
 
-    def all_annotations(self):
+    def query_annotations(self):
 
         data = self._execute_query(
             sqlite_file=self.aeannotation_sqlite,
