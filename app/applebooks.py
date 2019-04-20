@@ -50,10 +50,10 @@ class AppleBooks():
         """ Merge annotation with source based on "source_id".
         """
 
-        connect = ConnectToAppleBooksDB()
+        apple_books_db = ConnectToAppleBooksDB()
 
-        sources = connect.query_sources()
-        annotations = connect.query_annotations()
+        sources = apple_books_db.query_sources()
+        annotations = apple_books_db.query_annotations()
 
         self._annotations = []
 

@@ -1,79 +1,94 @@
 #!/usr/bin/env python3
 
-import requests
 import json
-from typing import List, Union
+import requests
 
 from .defaults import ApiDefaults
 
 
-class Api:
+class ConnectToApi:
 
     def __init__(self, appconfig):
 
-        self.appconfig = appconfig
+        url_base = appconfig["url_base"]
+        api_key = appconfig["api_key"]
 
-        self.base_url = self.appconfig["base_url"]
-
-        self.url_verify = f"{self.base_url}{ApiDefaults.url_verify}"
-        self.url_refresh = f"{self.base_url}{ApiDefaults.url_refresh}"
-        self.url_add = f"{self.base_url}{ApiDefaults.url_add}"
+        self.url_verify = f"{url_base}{ApiDefaults.url_verify}"
+        self.url_refresh = f"{url_base}{ApiDefaults.url_refresh}"
+        self.url_add = f"{url_base}{ApiDefaults.url_add}"
 
         self.headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.appconfig['api_key']}"
+            "Authorization": f"Bearer {api_key}"
         }
 
-    def verify(self) -> Union[bool, Exception]:
+        self._failures = []
+
+    def verify(self):
 
         try:
-            r = requests.get(self.url_verify, headers=self.headers)
+            get = requests.get(self.url_verify, headers=self.headers)
 
             # API key verified.
-            if r.status_code == 200:
+            if get.status_code == 200:
                 return True
 
             # Invalid API Key.
-            elif r.status_code == 401:
+            elif get.status_code == 401:
                 return False
 
             else:
-                raise Exception(f"Unexpected Error: {r.status_code}")
+                raise Exception(f"Unexpected Error: {get.status_code}")
 
         except requests.exceptions.ConnectionError:
             raise Exception("Connection Refused: The server is probably down...")
 
-    def post(self, data: List[dict], method: str) -> Union[bool, Exception]:
-        """ TODO: Cleanup up feedback method. This was written to be placed
-        in a try/except block. Are we still going with that?
-        """
+    def post(self, data, method):
+        """ TODO: This is far too complex. Simplify. The way failues are sent
+        back are a bit confusing. Need a clean way to check for any errors. """
 
         if method == "refresh":
             url = self.url_refresh
+
         elif method == "add":
             url = self.url_add
+
         else:
             raise Exception("Unrecognized API import method.")
 
         data = json.dumps(data)
 
         try:
-            r = requests.post(url, data=data, headers=self.headers)
+            post = requests.post(url, data=data, headers=self.headers)
 
             try:
-                response = r.json()
-                for key, value in response.items():
-                    if key != "response":
-                        print(f"{key}: {value}")
+                response = post.json()
 
-            except json.decoder.JSONDecodeError:
-                response = "No response from server..."
+                api_response = response.get("api_response", None)
 
-            if not r.status_code == 201:
-                raise Exception(f"Unexpected Error: {r.status_code}\n{response}")
+                if api_response not in ["SUCCESS", "FAILURES", "ERROR"]:
+                    raise Exception(f"Unexpected Error: {post}")
 
-            else:
-                return True
+                if api_response == "ERROR":
+                    raise Exception(response["message"])
+
+                elif api_response == "FAILURES":
+                    self._failures.extend(response["failures"])
+
+            except Exception as error:
+                raise Exception(error)
 
         except requests.exceptions.ConnectionError:
             raise Exception("Connection Refused: The server is probably down...")
+
+        except Exception as error:
+            raise Exception(error)
+
+    @property
+    def failures(self):
+        return self._failures
+
+    @property
+    def has_failures(self):
+        """ Returns True if import experienced any failures. """
+        return bool(self._failures)

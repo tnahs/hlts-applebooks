@@ -4,43 +4,22 @@ import json
 
 from .defaults import AppDefaults
 from .applebooks import AppleBooks
-from .api import Api
-from .tools import OSTools
+from .api import ConnectToApi
+from .tools import OSTools, print_progress_bar
+from .testing import generate_test_data
 
 
 """
-TODO: Build custom exceptions.
+TODO: Build custom exceptions. The ConnectToApi > Post Exception handling is
+insane, we need better names so we understand exactly whats happening.
+
+TODO: Cleanup the way we are recieving and bubbling up failures from the api.
+
+TODO: Write a more explicit information response when an import happens.
+Return a dictionary of data so we can display it.
+
+TODO: Clean up all methods called in App.run()
 """
-
-
-def generate_test_data(amount):
-
-    test_data = []
-
-    for num in range(amount):
-
-        test_data.append(
-            {
-                "id": f"ID-{num}",
-                "passage": f"Test passage #{num}!",
-                "source": {
-                    "name": "Testing Source",
-                    "author": "Testing Author"
-                },
-                "notes": "",
-                "tags": [],
-                "collections": [],
-                "metadata": {
-                    "in_trash": False,
-                    "is_protected": False,
-                    "origin": "testing",
-                    "modified": "",
-                    "created": ""
-                },
-            }
-        )
-
-    return test_data
 
 
 os = OSTools()
@@ -52,48 +31,67 @@ class App():
 
         self._build_directories()
         self._load_config()
-        # TODO: self._verify_config()
 
     def run(self):
 
         # self.applebooks = AppleBooks(self.config)
-        self.api = Api(self.config)
+        self.api = ConnectToApi(self.config)
 
-        # self.add_annotations()
-        # self.refresh_annotations()
+        self.add_annotations()
+        self.refresh_annotations()
+
+        if self.api.has_failures:
+            print(f"Encountered {len(self.api.failures)} failures.")
+            print(self.api.failures)
 
     def add_annotations(self):
 
-        data = generate_test_data(amount=100)
+        data = generate_test_data(amount=2000, offset=0)
 
         # data = self.applebooks.adding_annotations
-        chunks = self._chunk_data(data=data, chunk_size=50)
+        chunks = self._chunk_data(data=data, chunk_size=20)
 
         if self.api.verify():
+
             print(f"Adding {len(data)} annotations...")
-            for chunk in chunks:
-                self.api.post(chunk, "add")
+            number_of_chunks = len(chunks)
+            print_progress_bar(0, number_of_chunks)
+
+            for i, chunk in enumerate(chunks):
+
+                try:
+                    self.api.post(chunk, "add")
+                    print_progress_bar(i + 1, number_of_chunks)
+
+                except Exception as error:
+                    raise Exception(error)
 
     def refresh_annotations(self):
 
-        data = generate_test_data(amount=100)
+        data = generate_test_data(amount=2000, offset=0)
 
         # data = self.applebooks.adding_annotations
-        chunks = self._chunk_data(data=data, chunk_size=50)
+        chunks = self._chunk_data(data=data, chunk_size=20)
 
         if self.api.verify():
+
             print(f"Refreshing {len(data)} annotations...")
-            for chunk in chunks:
-                self.api.post(chunk, "refresh")
+            number_of_chunks = len(chunks)
+            print_progress_bar(0, number_of_chunks)
+#
+            for i, chunk in enumerate(chunks):
+
+                try:
+                    self.api.post(chunk, "refresh")
+                    print_progress_bar(i + 1, number_of_chunks)
+
+                except Exception as error:
+                    raise Exception(error)
 
     def _chunk_data(self, data: list, chunk_size):
         """ Instead of sending a long list of annotations all at once, this
         splits the list into a list of `chunk_size` lists. This helps prevent
         Request Timeouts.
-
-        TODO: We need a non async api url to really test if this works. Right
-        now it works really well with sending 5000 annotations. Not sure if it
-        will work as well without the async url.
         """
         return [data[x:x + chunk_size] for x in range(0, len(data), chunk_size)]
 
@@ -129,7 +127,7 @@ class App():
     def _set_config(self, key, value):
 
         valid_keys = [
-            "base_url",
+            "url_base",
             "api_key",
             "tag_prefix",
             "collection_prefix",
@@ -145,7 +143,7 @@ class App():
     def _set_default_config(self):
 
         self._config = {
-            "base_url": "http://www.hlts.app",
+            "url_base": "http://www.hlts.app",
             "api_key": "",
             "tag_prefix": "#",
             "collection_prefix": "@",

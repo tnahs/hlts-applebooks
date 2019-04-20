@@ -73,5 +73,5 @@ class AppleBooksDefaults:
 class ApiDefaults:
 
     url_verify = "/api/verify_api_key"
-    url_refresh = "/api/async/import/annotations/refresh"
-    url_add = "/api/async/import/annotations/add"
+    url_refresh = "/api/import/refresh"
+    url_add = "/api/import/add"

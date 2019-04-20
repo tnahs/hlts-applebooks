@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 import shutil
 import pathlib
 import psutil
@@ -72,3 +73,23 @@ def to_lower(input_: Union[list, str, dict]) -> Union[list, str, dict]:
 
     elif type(input_) is dict:
         return dict((k, v.lower()) for k, v in input_.items())
+
+
+def print_progress_bar(current_iteration, total_iteration, max_bar=50):
+    """ TODO: Clean this up. Both how it looks and how its implemented
+    inside of a loop.
+
+    Call in a loop to create terminal progress bar
+    """
+
+    completed_percent = f"{100 * (current_iteration / float(total_iteration)):.1f}"
+    completed_bar = int(round(max_bar * current_iteration / float(total_iteration)))
+
+    bar = f"{'▓' * completed_bar}{'░' * (max_bar - completed_bar)}"
+
+    sys.stdout.write(f"\r{bar} {completed_percent}%"),
+
+    if current_iteration == total_iteration:
+        sys.stdout.write("\n")
+
+    sys.stdout.flush()
