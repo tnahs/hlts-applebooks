@@ -9,12 +9,12 @@ from .defaults import ApiDefaults
 
 class ApiConnect:
 
-    def __init__(self, appconfig):
+    def __init__(self, config):
 
         self._response = []
 
-        url_base = appconfig["url_base"]
-        api_key = appconfig["api_key"]
+        url_base = config.url_base
+        api_key = config.api_key
 
         self.headers = {
             "Content-Type": "application/json",

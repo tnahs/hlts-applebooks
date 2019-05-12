@@ -69,14 +69,9 @@ class App:
     def __init__(self):
 
         self._build_directories()
-        self._load_config()
-        self._load_log()
 
-        """
-        TODO: Add custom AppLogger and AppConfig classes.
-        self.logger = AppLogger()
-        self.config = AppConfig()
-        """
+        self.logger = Logger(self)
+        self.config = Config(self)
 
     def run(self):
 
@@ -87,6 +82,18 @@ class App:
         self.api.verify()
         self.send_annotations()
         self.display_api_response()
+
+    def _build_directories(self):
+
+        # Create root_dir directory.
+        os.make_dir(path=AppDefaults.root_dir)
+
+        # Remove day_dir directory if it exists.
+        os.delete_dir(path=AppDefaults.day_dir)
+
+        # Creat new day_dir directory.
+        for path in [AppDefaults.day_dir, AppDefaults.db_dir, AppDefaults.json_dir]:
+            os.make_dir(path=path)
 
     def ask_confirmation(self):
 
@@ -99,8 +106,8 @@ class App:
         print(f"Found {len(data_r)} annotation to refresh.")
         """
 
-        num_add = self.applebooks.info["count"]["add"]
-        num_refresh = self.applebooks.info["count"]["refresh"]
+        num_add = self.applebooks.metadata["count"]["add"]
+        num_refresh = self.applebooks.metadata["count"]["refresh"]
 
         print(f"Found {num_add} annotation to add.")
         print(f"Found {num_refresh} annotation to refresh.")
@@ -151,7 +158,7 @@ class App:
 
     def display_api_response(self):
         print(self.api.response)
-        self._write_to_log(self.api.response)
+        self.logger.info(self.api.response)
 
     def _chunk_data(self, data: list, chunk_size=100):
         """ Instead of sending a long list of annotations all at once, this
@@ -160,117 +167,155 @@ class App:
         """
         return [data[x:x + chunk_size] for x in range(0, len(data), chunk_size)]
 
-    def _build_directories(self):
 
-        # Create root_dir directory.
-        os.make_dir(path=AppDefaults.root_dir)
+class Logger:
 
-        # Remove day_dir directory if it exists.
-        os.delete_dir(path=AppDefaults.day_dir)
+    def __init__(self, app):
 
-        # Creat new day_dir directory.
-        for path in [AppDefaults.day_dir, AppDefaults.db_dir, AppDefaults.json_dir]:
-            os.make_dir(path=path)
-
-    """ TODO: Wrap config methods into AppConfig() class? """
-
-    def _load_config(self):
-
-        try:
-            with open(AppDefaults.config_file, "r") as f:
-                self._config = json.load(f)
-        except FileNotFoundError:
-            self._set_default_config()
-            self._save_config()
-        except json.JSONDecodeError as error:
-            raise Exception(error)
-        except Exception as error:
-            raise Exception(f"Unexpected Error: {repr(error)}")
-
-    def _save_config(self):
-        with open(AppDefaults.config_file, "w") as f:
-            json.dump(self._config, f, sort_keys=True, indent=4, separators=(',', ': '))
-
-    def _set_config(self, key, value):
-        """ TODO: Un-used method. How are we implementing this? """
-
-        valid_keys = [
-            "url_base",
-            "api_key",
-            "tag_prefix",
-            "collection_prefix",
-            "applebooks_collections",
-            "skip_color",
-        ]
-
-        if key not in valid_keys:
-            raise KeyError("Inva lid Config Key")
-
-        self._config[key] = value
-
-    def _set_default_config(self):
-
-        self._config = {
-            "url_base": "http://www.hlts.app",
-            "api_key": "",
-            "tag_prefix": "#",
-            "collection_prefix": "@",
-            "applebooks_collections": {
-                "add": "",
-                "refresh": "",
-                "ignore": ""
-            },
-            "skip_color": {
-                "underline": False,
-                "green": False,
-                "blue": False,
-                "yellow": False,
-                "pink": False,
-                "purple": False
-            }
-        }
-
-    @property
-    def config(self):
-        return self._config
-
-    """ TODO: Cleanup logging methods.
-    Maybe wrap them into their own AppLogger() class?
-
-    Implemented maybe like:
-    self.logger.log("Something happened.")
-    self.logger.warning("Something kinda bad happened.")
-    self.logger.error("Something bad happened.")
-    self.logger.debug("Something buggy happened.")
-    """
-
-    def _load_log(self):
+        self.app = app
 
         try:
             with open(AppDefaults.log_file, "r") as f:
-                self._logfile = f.read()
+                self._log = f.read()
         except FileNotFoundError:
-            self._create_log()
+            self._create_new_log()
         except Exception as error:
             raise Exception(f"Unexpected Error: {repr(error)}")
 
-    def _create_log(self):
+    def __repr__(self):
+        return self._log
 
+    def _create_new_log(self):
         with open(AppDefaults.log_file, "w") as f:
             f.write("")
 
-    def _write_to_log(self, log):
+    def _write_to_log(self, message):
 
         date = datetime.now().isoformat()
 
         try:
             with open(AppDefaults.log_file, "a") as f:
-                f.write(f"{date}:\n{log}\n\n")
+                f.write(f"{date} - {message}\n")
         except FileNotFoundError:
-            self._create_log()
+            self._create_new_log()
         except Exception as error:
             raise Exception(f"Unexpected Error: {repr(error)}")
 
-    @property
-    def log(self):
-        return self._log
+    def info(self, info):
+        self._write_to_log(f"INFO: {info}")
+
+    def warning(self, warning):
+        self._write_to_log(f"WARNING: {warning}")
+
+    def error(self, error):
+        self._write_to_log(f"ERROR: {error}")
+
+
+class Config:
+
+    def __init__(self, app):
+
+        self.app = app
+
+        try:
+            with open(AppDefaults.config_file, "r") as f:
+                _config = json.load(f)
+                try:
+                    # Base
+                    self.env = _config["env"]
+                    self.url_base = _config["url_base"]
+                    self.api_key = _config["api_key"]
+                    self.prefix_tag = _config["prefix_tag"]
+                    self.prefix_collection = _config["prefix_collection"]
+                    # Apple Books
+                    self.applebooks_collections = _config["applebooks"]["collections"]
+                    self.applebooks_colors = _config["applebooks"]["colors"]
+                except KeyError as error:
+                    self._config_load_error(error)
+                    self._set_default_config()
+                    self._save_config()
+                except Exception as error:
+                    raise Exception(f"Unexpected Error: {repr(error)}")
+        except json.JSONDecodeError as error:
+            self._config_load_error(error)
+            self._set_default_config()
+            self._save_config()
+        except FileNotFoundError:
+            self._set_default_config()
+            self._save_config()
+        except Exception as error:
+            raise Exception(f"Unexpected Error: {repr(error)}")
+
+    def __repr__(self):
+        return str(self._serialize())
+
+    def _config_load_error(self, error):
+        """
+        via. https://docs.python.org/3/library/pathlib.html#pathlib.Path.replace
+        """
+        self.app.logger.error(f"Error reading {AppDefaults.config_file}.")
+        self.app.logger.error(repr(error))
+
+        config_file = AppDefaults.config_file
+        config_file_bak = config_file.with_suffix(".bak")
+
+        config_file.replace(config_file_bak)
+
+    def _set_default_config(self):
+
+        self.app.logger.warning(f"Setting {AppDefaults.name} to default configuration.")
+
+        self.env = ""
+        self.url_base = "http://www.hlts.app"
+        self.api_key = ""
+
+        self.prefix_tag = "#"
+        self.prefix_collection = "@"
+
+        self.applebooks_collections = {
+            "add": "",
+            "refresh": "",
+            "ignore": "",
+        }
+        self.applebooks_colors = {
+            "underline": True,
+            "green": True,
+            "blue": True,
+            "yellow": True,
+            "pink": True,
+            "purple": True,
+        }
+
+    def _save_config(self):
+
+        self.app.logger.info(f"Saving {AppDefaults.config_file}...")
+
+        with open(AppDefaults.config_file, "w") as f:
+            json.dump(self._serialize(), f, indent=4, separators=(',', ': '))
+
+    def _serialize(self):
+
+        _config = {
+            "env": self.env,
+            "url_base": self.url_base,
+            "api_key": self.api_key,
+            "prefix_tag": self.prefix_tag,
+            "prefix_collection": self.prefix_collection,
+            "applebooks": {
+                "collections": {
+                    "add": self.applebooks_collections["add"],
+                    "refresh": self.applebooks_collections["refresh"],
+                    "ignore": self.applebooks_collections["ignore"],
+                },
+                "colors": {
+                    "underline": self.applebooks_colors["underline"],
+                    "green": self.applebooks_colors["green"],
+                    "blue": self.applebooks_colors["blue"],
+                    "yellow": self.applebooks_colors["yellow"],
+                    "pink": self.applebooks_colors["pink"],
+                    "purple": self.applebooks_colors["purple"]
+                }
+            }
+        }
+
+        return _config

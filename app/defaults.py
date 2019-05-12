@@ -10,12 +10,14 @@ date = datetime.now().strftime("%Y%m%d")
 
 class AppDefaults:
 
-    # TODO: Rename App
-    root_dir = home / ".bsync"
+    name = "ABSync"
+
+    root_dir = home / ".hlts"
 
     config_file = root_dir / "config.json"
     log_file = root_dir / "app.log"
 
+    # TODO: Place these into the AppleBooksDefaults class.
     day_dir = root_dir / date
     db_dir = day_dir / "db"
     json_dir = day_dir / "json"

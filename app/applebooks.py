@@ -20,9 +20,9 @@ os = OSTools()
 
 class AppleBooks:
 
-    def __init__(self, appconfig):
+    def __init__(self, config):
 
-        self.appconfig = appconfig
+        self.config = config
 
         self.date = datetime.utcnow().isoformat()
 
@@ -72,7 +72,7 @@ class AppleBooks:
                     finally:
                         raw_annotation["applebooks_collections"].append(raw_source["books_collection"])
 
-            annotation = Annotation(self.appconfig, raw_annotation)
+            annotation = Annotation(self.config, raw_annotation)
 
             self._annotations.append(annotation)
 
@@ -94,11 +94,11 @@ class AppleBooks:
         self._skipping = []
         self._unsorted = []
 
-        applebooks_collections_config = to_lower(self.appconfig["applebooks_collections"])
+        abc_config = to_lower(self.config.applebooks_collections)
 
-        adding_collection = applebooks_collections_config.get("add", "")
-        refreshing_collection = applebooks_collections_config.get("refresh", "")
-        ignoring_collection = applebooks_collections_config.get("ignore", "")
+        adding_collection = abc_config.get("add", "")
+        refreshing_collection = abc_config.get("refresh", "")
+        ignoring_collection = abc_config.get("ignore", "")
 
         for annotation in self._annotations:
 
@@ -130,13 +130,13 @@ class AppleBooks:
             "ignore": self.ignoring_annotations,
             "skip": self.skipping_annotations,
             "unsorted": self.unsorted_annotations,
-            "metadata": self.info
+            "metadata": self.metadata
         }
 
         return data
 
     @property
-    def info(self):
+    def metadata(self):
 
         data = {
             "date": self.date,
@@ -187,9 +187,9 @@ class AppleBooks:
 
 class Annotation:
 
-    def __init__(self, appconfig, data: dict):
+    def __init__(self, config, data: dict):
 
-        self.appconfig = appconfig
+        self.config = config
         self.data = data
 
         self._process_passage()
@@ -211,22 +211,25 @@ class Annotation:
 
         _notes = self.data["notes"]
 
-        re_tag_prefix = re.compile(self.appconfig["tag_prefix"])
-        re_tag_pattern = re.compile(self._re_pattern(self.appconfig["tag_prefix"]))
-        re_collection_prefix = re.compile(self.appconfig["collection_prefix"])
-        re_collection_pattern = re.compile(self._re_pattern(self.appconfig["collection_prefix"]))
+        prefix_tag = self.config.prefix_tag
+        prefix_collection = self.config.prefix_collection
+
+        re_prefix_tag = re.compile(prefix_tag)
+        re_tag_pattern = re.compile(self._re_pattern(prefix_tag))
+        re_prefix_collection = re.compile(prefix_collection)
+        re_collection_pattern = re.compile(self._re_pattern(prefix_collection))
 
         if _notes:
 
             # Extract tags from notes.
             tags = re.findall(re_tag_pattern, _notes)
             tags = [tag.strip() for tag in tags]
-            tags = [re.sub(re_tag_prefix, "", tag) for tag in tags]
+            tags = [re.sub(re_prefix_tag, "", tag) for tag in tags]
 
             # Extract collections from notes.
             collections = re.findall(re_collection_pattern, _notes)
             collections = [collection.strip() for collection in collections]
-            collections = [re.sub(re_collection_prefix, "", collection) for collection in collections]
+            collections = [re.sub(re_prefix_collection, "", collection) for collection in collections]
 
             # Remove tags from notes.
             notes = re.sub(re_tag_pattern, "", _notes)
@@ -303,20 +306,20 @@ class Annotation:
 
         color = self._color
 
-        if color == 0 and self.appconfig["skip_color"]["underline"]:
-            return True
-        if color == 1 and self.appconfig["skip_color"]["green"]:
-            return True
-        if color == 2 and self.appconfig["skip_color"]["blue"]:
-            return True
-        if color == 3 and self.appconfig["skip_color"]["yellow"]:
-            return True
-        if color == 4 and self.appconfig["skip_color"]["pink"]:
-            return True
-        if color == 5 and self.appconfig["skip_color"]["purple"]:
-            return True
+        if color == 0 and self.config.applebooks_colors["underline"]:
+            return False
+        if color == 1 and self.config.applebooks_colors["green"]:
+            return False
+        if color == 2 and self.config.applebooks_colors["blue"]:
+            return False
+        if color == 3 and self.config.applebooks_colors["yellow"]:
+            return False
+        if color == 4 and self.config.applebooks_colors["pink"]:
+            return False
+        if color == 5 and self.config.applebooks_colors["purple"]:
+            return False
 
-        return False
+        return True
 
     def serialize(self):
 
