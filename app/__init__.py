@@ -8,7 +8,7 @@ from .defaults import AppDefaults
 from .applebooks import AppleBooks
 from .api import ApiConnect
 from .tools import OSTools, print_progress_bar
-from .testing import generate_dummy_annotations
+# from .testing import generate_dummy_annotations
 
 
 """
@@ -59,6 +59,7 @@ all un-changed annotations, it simply skips it.
 
 TODO: Test out concatenated annotation syntax!
 """
+
 
 os = OSTools()
 
