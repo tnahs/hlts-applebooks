@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 
 
-def generate_test_data(amount, offset=0):
+def generate_dummy_annotations(count, id_prefix=""):
 
     data = []
 
-    for num in range(amount):
+    for num in range(count):
 
         data.append(
             {
-                "id": f"ID-{num + offset}",
-                "passage": f"Testing data #{num + offset}!",
+                "id": f"ID-{id_prefix}-{num}",
+                "passage": f"Testing {num}!",
                 "source": {
                     "name": "Testing Source",
                     "author": "Testing Author"

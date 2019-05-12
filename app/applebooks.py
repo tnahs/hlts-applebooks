@@ -18,13 +18,7 @@ date = datetime.now().strftime("%Y%m%d")
 os = OSTools()
 
 
-"""
-TODO: The way the config is being passed from AppleBooks to Annotation is kinda
-confusing... Is there a cleaner way we can do that?
-"""
-
-
-class AppleBooks():
+class AppleBooks:
 
     def __init__(self, appconfig):
 
@@ -33,7 +27,8 @@ class AppleBooks():
         self.date = datetime.utcnow().isoformat()
 
         self._copy_databases()
-        self._compile_annotations()
+        self._query_applebooks_db()
+        self._build_annotations()
         self._sort_annotations()
 
     def _copy_databases(self):
@@ -46,83 +41,87 @@ class AppleBooks():
         os.copy_dir(src=AppleBooksDefaults.aeannotation_dir,
                     dest=AppDefaults.aeannotation_dir)
 
-    def _compile_annotations(self):
-        """ Merge annotation with source based on "source_id".
-        """
+    def _query_applebooks_db(self):
 
-        apple_books_db = ConnectToAppleBooksDB()
+        self.applebooks_db = ConnectToAppleBooksDB()
 
-        sources = apple_books_db.query_sources()
-        annotations = apple_books_db.query_annotations()
+        self._raw_sources = self.applebooks_db.query_sources()
+        self._raw_annotations = self.applebooks_db.query_annotations()
+
+    def _build_annotations(self):
+        """ TODO: Document what this code is doing and how it's doing it."""
 
         self._annotations = []
 
-        for raw_annotation in annotations:
+        for raw_annotation in self._raw_annotations:
 
-            for raw_source in sources:
+            for raw_source in self._raw_sources:
 
                 if raw_annotation["source_id"] == raw_source["id"]:
 
-                    if not raw_annotation.get("source") and not raw_annotation.get("author"):
+                    """ TODO: Not sure what this if block is checking. """
+                    if not raw_annotation.get("source") \
+                       and not raw_annotation.get("author"):
                         raw_annotation["source"] = raw_source["name"]
                         raw_annotation["author"] = raw_source["author"]
 
                     try:
-                        raw_annotation["books_collections"]
+                        raw_annotation["applebooks_collections"]
                     except KeyError:
-                        raw_annotation["books_collections"] = []
+                        raw_annotation["applebooks_collections"] = []
                     finally:
-                        raw_annotation["books_collections"].append(raw_source["books_collection"])
+                        raw_annotation["applebooks_collections"].append(raw_source["books_collection"])
 
             annotation = Annotation(self.appconfig, raw_annotation)
 
             self._annotations.append(annotation)
 
     def _sort_annotations(self):
-        """ If an annotation contains two conflicting "books_collections", it
-        will sorted in this order: skip > ignore > refresh > add. "Skip" is the
-        strongest in the list followed by "ignore" all the way down the line to
-        "add" which can act as a catch-all if no "add" collection is specified.
+        """ If an annotation contains two conflicting "applebooks_collections", it
+        will sorted in this order: skip > ignore > refresh > add > unsorted.
+        The strongest in the list is "skip" followed by "ignore" all the way
+        down the line to "add". Everything else that remains is placed into
+        "unsorted" which acts as a catch-all if no collections are specified.
+
+        TODO: Clean variable names here. It's kinda messy and confusing. Also,
+        will anything ever make it into the "unsorted" bin with our current
+        setup?
         """
 
         self._adding = []
         self._refreshing = []
         self._ignoring = []
         self._skipping = []
+        self._unsorted = []
 
-        books_collections = to_lower(self.appconfig["books_collections"])
+        applebooks_collections_config = to_lower(self.appconfig["applebooks_collections"])
 
-        adding_collection = books_collections.get("add", "")
-        refreshing_collection = books_collections.get("refresh", "")
-        ignoring_collection = books_collections.get("ignore", "")
+        adding_collection = applebooks_collections_config.get("add", "")
+        refreshing_collection = applebooks_collections_config.get("refresh", "")
+        ignoring_collection = applebooks_collections_config.get("ignore", "")
 
         for annotation in self._annotations:
 
-            books_collections = to_lower(annotation.books_collections)
+            applebooks_collections = to_lower(annotation._applebooks_collections)
 
             if annotation.is_skipped:
                 self._skipping.append(annotation)
                 continue
 
-            if ignoring_collection in books_collections:
+            if ignoring_collection in applebooks_collections:
                 self._ignoring.append(annotation)
 
-            elif refreshing_collection in books_collections:
+            elif refreshing_collection in applebooks_collections:
                 self._refreshing.append(annotation)
 
-            elif adding_collection in books_collections or adding_collection == "":
+            elif adding_collection in applebooks_collections:
                 self._adding.append(annotation)
 
-    @staticmethod
-    def serialize(item):
-        return [x.to_dict() for x in item]
+            else:
+                self._unsorted.append(annotation)
 
     @property
-    def all_annotations(self):
-        return self.serialize(self._annotations)
-
-    @property
-    def sorted_annotations(self):
+    def data(self):
 
         data = {
             "all": self.all_annotations,
@@ -130,6 +129,7 @@ class AppleBooks():
             "refresh": self.refreshing_annotations,
             "ignore": self.ignoring_annotations,
             "skip": self.skipping_annotations,
+            "unsorted": self.unsorted_annotations,
             "metadata": self.info
         }
 
@@ -146,30 +146,43 @@ class AppleBooks():
                 "refresh": len(self.refreshing_annotations),
                 "ignore": len(self.ignoring_annotations),
                 "skip": len(self.skipping_annotations),
+                "unsorted": len(self.unsorted_annotations),
             }
         }
 
         return data
 
+    @staticmethod
+    def _to_multiple_dict(annotations):
+        return [annotation.serialize() for annotation in annotations]
+
+    @property
+    def all_annotations(self):
+        return self._to_multiple_dict(self._annotations)
+
     @property
     def adding_annotations(self):
-        return self.serialize(self._adding)
+        return self._to_multiple_dict(self._adding)
 
     @property
     def refreshing_annotations(self):
-        return self.serialize(self._refreshing)
+        return self._to_multiple_dict(self._refreshing)
 
     @property
     def ignoring_annotations(self):
-        return self.serialize(self._ignoring)
+        return self._to_multiple_dict(self._ignoring)
 
     @property
     def skipping_annotations(self):
-        return self.serialize(self._skipping)
+        return self._to_multiple_dict(self._skipping)
+
+    @property
+    def unsorted_annotations(self):
+        return self._to_multiple_dict(self._unsorted)
 
     def export_to_json(self, directory, filename):
         with open(directory / filename, 'w') as f:
-            json.dump(self.sorted_annotations, f, sort_keys=True, indent=4, separators=(',', ': '))
+            json.dump(self.data, f, sort_keys=True, indent=4, separators=(',', ': '))
 
 
 class Annotation:
@@ -192,28 +205,31 @@ class Annotation:
         return f"\B{prefix}[^{prefix}\s]+\s?"
 
     def _process_notes(self):
+        """ TODO: This whole method is really hard to understand. Can we
+        possibly simplify it in any way?
+        """
 
-        notes = self.data["notes"]
+        _notes = self.data["notes"]
 
         re_tag_prefix = re.compile(self.appconfig["tag_prefix"])
         re_tag_pattern = re.compile(self._re_pattern(self.appconfig["tag_prefix"]))
         re_collection_prefix = re.compile(self.appconfig["collection_prefix"])
         re_collection_pattern = re.compile(self._re_pattern(self.appconfig["collection_prefix"]))
 
-        if notes:
+        if _notes:
 
             # Extract tags from notes.
-            tags = re.findall(re_tag_pattern, notes)
+            tags = re.findall(re_tag_pattern, _notes)
             tags = [tag.strip() for tag in tags]
             tags = [re.sub(re_tag_prefix, "", tag) for tag in tags]
 
             # Extract collections from notes.
-            collections = re.findall(re_collection_pattern, notes)
+            collections = re.findall(re_collection_pattern, _notes)
             collections = [collection.strip() for collection in collections]
             collections = [re.sub(re_collection_prefix, "", collection) for collection in collections]
 
             # Remove tags from notes.
-            notes = re.sub(re_tag_pattern, "", notes)
+            notes = re.sub(re_tag_pattern, "", _notes)
             notes = re.sub(re_collection_pattern, "", notes)
             notes = notes.strip()
 
@@ -274,18 +290,18 @@ class Annotation:
         return self._convert_date(self.data["modified"])
 
     @property
-    def color(self):
+    def _color(self):
         return self.data["color"]
 
     @property
-    def books_collections(self):
-        return self.data["books_collections"]
+    def _applebooks_collections(self):
+        return self.data["applebooks_collections"]
 
     @property
     def is_skipped(self):
         """ Skip annotations based on User Config. """
 
-        color = self.data["color"]
+        color = self._color
 
         if color == 0 and self.appconfig["skip_color"]["underline"]:
             return True
@@ -302,7 +318,7 @@ class Annotation:
 
         return False
 
-    def to_dict(self):
+    def serialize(self):
 
         data = {
             "id": self.id,
@@ -318,7 +334,7 @@ class Annotation:
                 "created": self.created,
                 "modified": self.modified,
                 "origin": AppleBooksDefaults.origin,
-                "is_protected": True,
+                "is_protected": False,
                 "in_trash": False,
             }
         }
