@@ -2,12 +2,13 @@
 
 import re
 import json
-import sqlite3
+import psutil
 import pathlib
+import sqlite3
 from pathlib import Path
 from datetime import datetime
 
-from .defaults import AppDefaults, AppleBooksDefaults
+from .defaults import AppleBooksDefaults
 from .tools import OSTools, to_lower
 
 
@@ -20,33 +21,77 @@ os = OSTools()
 
 class AppleBooks:
 
-    def __init__(self, config):
+    def __init__(self, app):
 
-        self.config = config
+        self.app = app
 
-        self.date = datetime.utcnow().isoformat()
+        self._build_directories()
+
+    def manage(self):
+
+        if self._applebooks_running():
+            raise Exception("Apple Books currently running.")
 
         self._copy_databases()
         self._query_applebooks_db()
         self._build_annotations()
         self._sort_annotations()
 
+    @staticmethod
+    def _applebooks_running():
+        """ Check to see if AppleBooks is currently running.
+        """
+
+        for proc in psutil.process_iter():
+
+            try:
+                pinfo = proc.as_dict(attrs=["name"])
+            except psutil.NoSuchProcess:
+                """ When a process doesn't have a name it might mean it's a
+                zombie process which ends up raising a NoSuchProcess exception
+                or its subclass the ZombieProcess exception.
+                """
+                pass
+            except Exception as error:
+                raise Exception(repr(error))
+
+            if pinfo["name"] == "Books":
+                return True
+
+        return False
+
+    def _build_directories(self):
+        """ Build all relevant directories for AppleBooks. We dont create the
+        directories for local_bklibrary_dir and local_aeannotation_dir seeing
+        as these are created when the source databases are copied over. """
+
+        # Create local_root_dir
+        os.make_dir(path=AppleBooksDefaults.local_root_dir)
+
+        # Delete local_day_dir. Just in case app is run more than once a day.
+        os.delete_dir(path=AppleBooksDefaults.local_day_dir)
+
+        # Creat new local_day_dir and local_db_dir directory.
+        for path in [AppleBooksDefaults.local_day_dir, AppleBooksDefaults.local_db_dir]:
+            os.make_dir(path=path)
+
     def _copy_databases(self):
+        """ Copy AppleBooks database directories to Local Data directories. """
 
-        # Copy BKLibrary###.sqlite files
-        os.copy_dir(src=AppleBooksDefaults.bklibrary_dir,
-                    dest=AppDefaults.bklibrary_dir)
+        # Copy directory containing BKLibrary###.sqlite files.
+        os.copy_dir(src=AppleBooksDefaults.src_bklibrary_dir,
+                    dest=AppleBooksDefaults.local_bklibrary_dir)
 
-        # Copy AEAnnotation###.sqlite files
-        os.copy_dir(src=AppleBooksDefaults.aeannotation_dir,
-                    dest=AppDefaults.aeannotation_dir)
+        # Copy directory containing AEAnnotation###.sqlite files.
+        os.copy_dir(src=AppleBooksDefaults.src_aeannotation_dir,
+                    dest=AppleBooksDefaults.local_aeannotation_dir)
 
     def _query_applebooks_db(self):
 
-        self.applebooks_db = ConnectToAppleBooksDB()
+        self.db = ConnectToAppleBooksDB()
 
-        self._raw_sources = self.applebooks_db.query_sources()
-        self._raw_annotations = self.applebooks_db.query_annotations()
+        self._raw_sources = self.db.query_sources()
+        self._raw_annotations = self.db.query_annotations()
 
     def _build_annotations(self):
         """ TODO: Document what this code is doing and how it's doing it."""
@@ -72,7 +117,7 @@ class AppleBooks:
                     finally:
                         raw_annotation["applebooks_collections"].append(raw_source["books_collection"])
 
-            annotation = Annotation(self.config, raw_annotation)
+            annotation = Annotation(self.app, raw_annotation)
 
             self._annotations.append(annotation)
 
@@ -94,7 +139,7 @@ class AppleBooks:
         self._skipping = []
         self._unsorted = []
 
-        abc_config = to_lower(self.config.applebooks_collections)
+        abc_config = to_lower(self.app.config.applebooks_collections)
 
         adding_collection = abc_config.get("add", "")
         refreshing_collection = abc_config.get("refresh", "")
@@ -139,7 +184,7 @@ class AppleBooks:
     def metadata(self):
 
         data = {
-            "date": self.date,
+            "date": datetime.utcnow().isoformat(),
             "count": {
                 "all": len(self.all_annotations),
                 "add": len(self.adding_annotations),
@@ -182,14 +227,14 @@ class AppleBooks:
 
     def export_to_json(self, directory, filename):
         with open(directory / filename, 'w') as f:
-            json.dump(self.data, f, sort_keys=True, indent=4, separators=(',', ': '))
+            json.dump(self.data, f, indent=4)
 
 
 class Annotation:
 
-    def __init__(self, config, data: dict):
+    def __init__(self, app, data: dict):
 
-        self.config = config
+        self.app = app
         self.data = data
 
         self._process_passage()
@@ -201,9 +246,6 @@ class Annotation:
 
         self._passage = passage.replace("\n", "\n\n")
 
-    def _re_pattern(self, prefix):
-        return f"\B{prefix}[^{prefix}\s]+\s?"
-
     def _process_notes(self):
         """ TODO: This whole method is really hard to understand. Can we
         possibly simplify it in any way?
@@ -211,8 +253,8 @@ class Annotation:
 
         _notes = self.data["notes"]
 
-        prefix_tag = self.config.prefix_tag
-        prefix_collection = self.config.prefix_collection
+        prefix_tag = self.app.config.prefix_tag
+        prefix_collection = self.app.config.prefix_collection
 
         re_prefix_tag = re.compile(prefix_tag)
         re_tag_pattern = re.compile(self._re_pattern(prefix_tag))
@@ -245,6 +287,9 @@ class Annotation:
         self._notes = notes
         self._tags = tags
         self._collections = collections
+
+    def _re_pattern(self, prefix):
+        return f"\B{prefix}[^{prefix}\s]+\s?"
 
     def _convert_date(self, epoch: float) -> str:
         """ Converts Epoch to ISO861"""
@@ -306,17 +351,17 @@ class Annotation:
 
         color = self._color
 
-        if color == 0 and self.config.applebooks_colors["underline"]:
+        if color == 0 and self.app.config.applebooks_colors["underline"]:
             return False
-        if color == 1 and self.config.applebooks_colors["green"]:
+        if color == 1 and self.app.config.applebooks_colors["green"]:
             return False
-        if color == 2 and self.config.applebooks_colors["blue"]:
+        if color == 2 and self.app.config.applebooks_colors["blue"]:
             return False
-        if color == 3 and self.config.applebooks_colors["yellow"]:
+        if color == 3 and self.app.config.applebooks_colors["yellow"]:
             return False
-        if color == 4 and self.config.applebooks_colors["pink"]:
+        if color == 4 and self.app.config.applebooks_colors["pink"]:
             return False
-        if color == 5 and self.config.applebooks_colors["purple"]:
+        if color == 5 and self.app.config.applebooks_colors["purple"]:
             return False
 
         return True
@@ -349,14 +394,14 @@ class ConnectToAppleBooksDB:
 
     def __init__(self):
 
-        self.bklibrary_sqlite = self._get_sqlite(path=AppDefaults.bklibrary_dir)
-        self.aeannotation_sqlite = self._get_sqlite(path=AppDefaults.aeannotation_dir)
+        self.bklibrary_sqlite = self._get_sqlite(path=AppleBooksDefaults.local_bklibrary_dir)
+        self.aeannotation_sqlite = self._get_sqlite(path=AppleBooksDefaults.local_aeannotation_dir)
 
     def query_sources(self):
 
         data = self._execute_query(
             sqlite_file=self.bklibrary_sqlite,
-            query=AppDefaults.source_query)
+            query=AppleBooksDefaults.source_query)
 
         return data
 
@@ -364,7 +409,7 @@ class ConnectToAppleBooksDB:
 
         data = self._execute_query(
             sqlite_file=self.aeannotation_sqlite,
-            query=AppDefaults.annotation_query)
+            query=AppleBooksDefaults.annotation_query)
 
         return data
 
@@ -377,7 +422,7 @@ class ConnectToAppleBooksDB:
             sqlite_file = sqlite_file[0]
             return sqlite_file
         except IndexError:
-            raise Exception(f"Couldn't find Apple Books database @ {path}. Exiting!")
+            raise Exception(f"Couldn't find AppleBooks database @ {path}.")
 
     def _execute_query(self, sqlite_file, query) -> list:
 
@@ -398,7 +443,7 @@ class ConnectToAppleBooksDB:
             connection.row_factory = self._dict_factory
             return connection
         except sqlite3.Error as error:
-            raise Exception(error)
+            raise Exception(repr(error))
 
         return None
 

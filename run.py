@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
+import sys
+
 from app import App
-from app.tools import applebooks_running
 
 
 app = App()
@@ -9,7 +10,5 @@ app = App()
 
 if __name__ == "__main__":
 
-    if not applebooks_running():
-        app.run()
-    else:
-        raise Exception("Apple Books currently running.")
+    app.run()
+    sys.exit()

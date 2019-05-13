@@ -9,12 +9,12 @@ from .defaults import ApiDefaults
 
 class ApiConnect:
 
-    def __init__(self, config):
+    def __init__(self, app):
 
-        self._response = []
+        self.app = app
 
-        url_base = config.url_base
-        api_key = config.api_key
+        url_base = self.app.config.url_base
+        api_key = self.app.config.api_key
 
         self.headers = {
             "Content-Type": "application/json",
@@ -32,7 +32,9 @@ class ApiConnect:
         self._url_error404 = f"{url_base}/api/error404"
         self._url_error405 = f"{url_base}/api/error405"
 
-    def verify(self):
+        self._response = []
+
+    def verify_key(self):
         """ TODO: After standardizing the API response re-write this method. """
 
         try:
@@ -46,15 +48,12 @@ class ApiConnect:
 
         except requests.exceptions.HTTPError as http_error:
             print(f"\nHTTP Error occurred: {http_error}")
-            sys.exit(-1)
-
         except requests.exceptions.ConnectionError as connection_error:
             print(f"\nConnection Error occured: {connection_error}")
-            sys.exit(-1)
-
         except Exception as unknown_error:
             print(f"\nUnknown Error occurred: {unknown_error}")
-            sys.exit(-1)
+
+        return False
 
     def post(self, data, method):
         """ TODO: After standardizing the API response re-write this method. """
@@ -94,4 +93,4 @@ class ApiConnect:
 
     @property
     def response(self):
-        return json.dumps(self._response, sort_keys=True, indent=4)
+        return json.dumps(self._response, indent=4)

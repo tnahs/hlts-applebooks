@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import sys
 import json
 from datetime import datetime
 
@@ -14,18 +13,6 @@ from .tools import OSTools, print_progress_bar
 """
 NOTE: The places we need to focus on are mainly the API and this app. We should
 try and get clear communication and feedback between the two endpoints.
-
-TODO: Build custom exceptions. The ApiConnect > Post Exception handling is
-insane, we need better names so we understand exactly whats happening.
-
-TODO: The way the config is being passed from AppleBooks to Annotation is kinda
-confusing... Is there a cleaner way we can do that? It would be nice if we
-could create a config object and pass that around the app without having to
-pass it in the __init__ of a new object.
-
-TODO: Add a way to append a temporary collection to the import. Anything that
-is refreshed or added will get in a way "collection stamped" so you can see what
-was added or refreshed today. "added-10121990" or "refreshed-10121990"
 
 TODO: Implement your own standard API response. Like:
 
@@ -49,7 +36,11 @@ TODO: Implement your own standard API response. Like:
 
 Or Like: https://github.com/omniti-labs/jsend
 
-NOTE: Do we NEED an `add` *and* a `refresh` method? Could we just make it
+TODO: Add a way to append a temporary collection to the import. Anything that
+is refreshed or added will get in a way "collection stamped" so you can see what
+was added or refreshed today. "added-10121990" or "refreshed-10121990"
+
+QUESTION: Do we NEED an `add` *and* a `refresh` method? Could we just make it
 only one method? What are the situations where it would be advantaeous to use
 both. Doesn't the fact that we have a `protected` attribute allow us to just
 stick with one method?
@@ -57,7 +48,12 @@ stick with one method?
 It seems that adding is way more efficent. Instead of deleting and re-adding
 all un-changed annotations, it simply skips it.
 
+TODO: Build custom exceptions. The ApiConnect > Post Exception handling is
+insane, we need better names so we understand exactly whats happening.
+
 TODO: Test out concatenated annotation syntax!
+
+heroku run flask erase_all_annotations --app hlts-dev
 """
 
 
@@ -70,35 +66,42 @@ class App:
 
         self._build_directories()
 
+        """ This proceeding order is important. We need to instantiate
+        the Logger and Config objects before we can properly instantiate the
+        ApiConnect and AppleBooks objects.
+
+        All four take the the app as the first argument. This is how we are
+        passing the app.config and app.logger to the rest of the application.
+        """
+
         self.logger = Logger(self)
         self.config = Config(self)
 
+        self.api = ApiConnect(self)
+        self.applebooks = AppleBooks(self)
+
     def run(self):
 
-        self.applebooks = AppleBooks(self.config)
-        self.api = ApiConnect(self.config)
+        print(f"\nConnecting to {self.config.url_base}...")
 
-        self.ask_confirmation()
-        self.api.verify()
-        self.send_annotations()
-        self.display_api_response()
+        if self.api.verify_key():
+
+            self.applebooks.manage()
+
+            if self.confirm():
+                self.send_annotations()
+                self.display_api_response()
 
     def _build_directories(self):
 
-        # Create root_dir directory.
+        # Create app root_dir directory.
         os.make_dir(path=AppDefaults.root_dir)
 
-        # Remove day_dir directory if it exists.
-        os.delete_dir(path=AppDefaults.day_dir)
-
-        # Creat new day_dir directory.
-        for path in [AppDefaults.day_dir, AppDefaults.db_dir, AppDefaults.json_dir]:
-            os.make_dir(path=path)
-
-    def ask_confirmation(self):
+    def confirm(self):
+        """ WIP """
 
         """
-        # Testing
+        TESTING
         data_a = generate_dummy_annotations(count=50, id_prefix="TEST3")
         data_r = generate_dummy_annotations(count=25, id_prefix="TEST3")
 
@@ -109,14 +112,16 @@ class App:
         num_add = self.applebooks.metadata["count"]["add"]
         num_refresh = self.applebooks.metadata["count"]["refresh"]
 
-        print(f"Found {num_add} annotation to add.")
-        print(f"Found {num_refresh} annotation to refresh.")
+        confirm = input(f"\nConfirm to add:{num_add} refresh:{num_refresh} annotations? [y/N]: ")
 
-        if input("Confirm? [y/N] ").lower().strip() != "y":
-            print("Exiting!")
-            sys.exit(-1)
+        if confirm.lower().strip() != "y":
+            print("Confirmation cancelled.")
+            return False
+
+        return True
 
     def send_annotations(self):
+        """ WIP """
         """ TODO: Clean and dry this code out. Maybe compact it so that we have
         only one progress bar? """
 
@@ -157,6 +162,7 @@ class App:
                 print_progress_bar(count + 1, number_of_chunks)
 
     def display_api_response(self):
+        """ WIP """
         print(self.api.response)
         self.logger.info(self.api.response)
 
@@ -164,6 +170,8 @@ class App:
         """ Instead of sending a long list of annotations all at once, this
         splits the list into a list of `chunk_size` lists. This helps prevent
         Timeouts.
+
+        QUESTION: Should this be moved to .tools?
         """
         return [data[x:x + chunk_size] for x in range(0, len(data), chunk_size)]
 
@@ -291,7 +299,7 @@ class Config:
         self.app.logger.info(f"Saving {AppDefaults.config_file}...")
 
         with open(AppDefaults.config_file, "w") as f:
-            json.dump(self._serialize(), f, indent=4, separators=(',', ': '))
+            json.dump(self._serialize(), f, indent=4)
 
     def _serialize(self):
 

@@ -4,26 +4,47 @@ from pathlib import Path
 from datetime import datetime
 
 
-home = Path.home()
-date = datetime.now().strftime("%Y%m%d")
+HOME = Path.home()
+DATE = datetime.now().strftime("%Y%m%d")
 
 
 class AppDefaults:
 
-    name = "ABSync"
+    name = "hltsync"
+    name_pretty = "HL+Sync"
 
-    root_dir = home / ".hlts"
-
+    root_dir = HOME / ".hltsync"
     config_file = root_dir / "config.json"
     log_file = root_dir / "app.log"
 
-    # TODO: Place these into the AppleBooksDefaults class.
-    day_dir = root_dir / date
-    db_dir = day_dir / "db"
-    json_dir = day_dir / "json"
-    bklibrary_dir = db_dir / "BKLibrary"
-    aeannotation_dir = db_dir / "AEAnnotation"
 
+class ApiDefaults:
+
+    url_verify = "/api/verify_api_key"
+    url_refresh = "/api/import/refresh"
+    url_add = "/api/import/add"
+
+
+class AppleBooksDefaults:
+
+    # AppleBooks Data
+    src_root_dir = HOME / "Library/Containers/com.apple.iBooksX/Data/Documents"
+    src_bklibrary_dir = src_root_dir / "BKLibrary"
+    src_aeannotation_dir = src_root_dir / "AEAnnotation"
+
+    # Local Data
+    local_root_dir = AppDefaults.root_dir / "applebooks"
+    local_day_dir = local_root_dir / DATE
+    local_db_dir = local_day_dir / "db"
+    local_bklibrary_dir = local_db_dir / "BKLibrary"
+    local_aeannotation_dir = local_db_dir / "AEAnnotation"
+
+    # Misc
+    origin = "apple_books"
+    ns_time_interval_since_1970 = 978307200.0
+    current_version = "Books v1.6 (1636.1)"
+
+    # Queries
     annotation_query = """
         SELECT
             ZAEANNOTATION.ZANNOTATIONASSETID as source_id,
@@ -61,21 +82,3 @@ class AppDefaults:
 
         ORDER BY ZBKLIBRARYASSET.ZTITLE;
     """
-
-
-class AppleBooksDefaults:
-
-    root = home / "Library/Containers/com.apple.iBooksX/Data/Documents"
-    bklibrary_dir = root / "BKLibrary"
-    aeannotation_dir = root / "AEAnnotation"
-
-    ns_time_interval_since_1970 = 978307200.0
-    origin = "apple_books"
-    current_version = "Books v1.6 (1636.1)"
-
-
-class ApiDefaults:
-
-    url_verify = "/api/verify_api_key"
-    url_refresh = "/api/import/refresh"
-    url_add = "/api/import/add"

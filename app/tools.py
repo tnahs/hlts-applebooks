@@ -4,33 +4,10 @@ import os
 import sys
 import shutil
 import pathlib
-import psutil
 from typing import Union
 
 
-def applebooks_running() -> bool:
-
-    for proc in psutil.process_iter():
-
-        try:
-            pinfo = proc.as_dict(attrs=["name"])
-        except psutil.NoSuchProcess:
-            """ When a process doesn't have a name it might mean it's a zombie
-            process which ends up raising a NoSuchProcess exception or its
-            subclass the ZombieProcess exception.
-            """
-            pass
-        except Exception as error:
-            raise Exception(error)
-
-        if pinfo["name"] == "Books":
-            return True
-
-    return False
-
-
 class OSTools:
-    """ TODO: Be more explicit with the Exceptions here..."""
 
     def delete_dir(self, path: pathlib.PosixPath) -> None:
 
@@ -39,7 +16,7 @@ class OSTools:
         except OSError:
             pass
         except Exception as error:
-            raise Exception(error)
+            raise Exception(repr(error))
 
     def make_dir(self, path: pathlib.PosixPath) -> None:
 
@@ -50,7 +27,7 @@ class OSTools:
         except OSError as error:
             raise Exception(f"{error.filename} - {error.strerror}")
         except Exception as error:
-            raise Exception(error)
+            raise Exception(repr(error))
 
     def copy_dir(self, src: pathlib.PosixPath,
                  dest: pathlib.PosixPath) -> None:
@@ -60,7 +37,7 @@ class OSTools:
         except OSError as error:
             raise Exception(f"{error.filename} - {error.strerror}")
         except Exception as error:
-            raise Exception(error)
+            raise Exception(repr(error))
 
 
 def to_lower(input_: Union[list, str, dict]) -> Union[list, str, dict]:
@@ -76,10 +53,9 @@ def to_lower(input_: Union[list, str, dict]) -> Union[list, str, dict]:
 
 
 def print_progress_bar(current_iteration, total_iteration, max_bar=50):
-    """ TODO: Clean this up. Both how it looks and how its implemented
-    inside of a loop.
+    """ TODO: Clean how this is implemented inside of a loop.
 
-    Call in a loop to create terminal progress bar
+    Call in a loop to create terminal progress bar.
     """
 
     completed_percent = f"{100 * (current_iteration / float(total_iteration)):.1f}"
