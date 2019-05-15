@@ -9,14 +9,11 @@ from pathlib import Path
 from datetime import datetime
 
 from .defaults import AppleBooksDefaults
-from .tools import OSTools, to_lower
+from .errors import ApplicationError
 
 
 home = Path.home()
 date = datetime.now().strftime("%Y%m%d")
-
-
-os = OSTools()
 
 
 class AppleBooks:
@@ -30,15 +27,14 @@ class AppleBooks:
     def manage(self):
 
         if self._applebooks_running():
-            raise Exception("Apple Books currently running.")
+            raise ApplicationError("Apple Books currently running.", self.app)
 
         self._copy_databases()
         self._query_applebooks_db()
         self._build_annotations()
         self._sort_annotations()
 
-    @staticmethod
-    def _applebooks_running():
+    def _applebooks_running(self):
         """ Check to see if AppleBooks is currently running.
         """
 
@@ -53,7 +49,7 @@ class AppleBooks:
                 """
                 pass
             except Exception as error:
-                raise Exception(repr(error))
+                raise ApplicationError(f"Unexpected Error: {repr(error)}", self.app)
 
             if pinfo["name"] == "Books":
                 return True
@@ -66,29 +62,29 @@ class AppleBooks:
         as these are created when the source databases are copied over. """
 
         # Create local_root_dir
-        os.make_dir(path=AppleBooksDefaults.local_root_dir)
+        self.app.utils.make_dir(path=AppleBooksDefaults.local_root_dir)
 
         # Delete local_day_dir. Just in case app is run more than once a day.
-        os.delete_dir(path=AppleBooksDefaults.local_day_dir)
+        self.app.utils.delete_dir(path=AppleBooksDefaults.local_day_dir)
 
         # Creat new local_day_dir and local_db_dir directory.
         for path in [AppleBooksDefaults.local_day_dir, AppleBooksDefaults.local_db_dir]:
-            os.make_dir(path=path)
+            self.app.utils.make_dir(path=path)
 
     def _copy_databases(self):
         """ Copy AppleBooks database directories to Local Data directories. """
 
         # Copy directory containing BKLibrary###.sqlite files.
-        os.copy_dir(src=AppleBooksDefaults.src_bklibrary_dir,
+        self.app.utils.copy_dir(src=AppleBooksDefaults.src_bklibrary_dir,
                     dest=AppleBooksDefaults.local_bklibrary_dir)
 
         # Copy directory containing AEAnnotation###.sqlite files.
-        os.copy_dir(src=AppleBooksDefaults.src_aeannotation_dir,
+        self.app.utils.copy_dir(src=AppleBooksDefaults.src_aeannotation_dir,
                     dest=AppleBooksDefaults.local_aeannotation_dir)
 
     def _query_applebooks_db(self):
 
-        self.db = ConnectToAppleBooksDB()
+        self.db = ConnectToAppleBooksDB(self.app)
 
         self._raw_sources = self.db.query_sources()
         self._raw_annotations = self.db.query_annotations()
@@ -139,7 +135,7 @@ class AppleBooks:
         self._skipping = []
         self._unsorted = []
 
-        abc_config = to_lower(self.app.config.applebooks_collections)
+        abc_config = self.app.utils.to_lowercase(self.app.config.applebooks_collections)
 
         adding_collection = abc_config.get("add", "")
         refreshing_collection = abc_config.get("refresh", "")
@@ -147,7 +143,7 @@ class AppleBooks:
 
         for annotation in self._annotations:
 
-            applebooks_collections = to_lower(annotation._applebooks_collections)
+            applebooks_collections = self.app.utils.to_lowercase(annotation._applebooks_collections)
 
             if annotation.is_skipped:
                 self._skipping.append(annotation)
@@ -392,7 +388,9 @@ class Annotation:
 
 class ConnectToAppleBooksDB:
 
-    def __init__(self):
+    def __init__(self, app):
+
+        self.app = app
 
         self.bklibrary_sqlite = self._get_sqlite(path=AppleBooksDefaults.local_bklibrary_dir)
         self.aeannotation_sqlite = self._get_sqlite(path=AppleBooksDefaults.local_aeannotation_dir)
@@ -422,7 +420,7 @@ class ConnectToAppleBooksDB:
             sqlite_file = sqlite_file[0]
             return sqlite_file
         except IndexError:
-            raise Exception(f"Couldn't find AppleBooks database @ {path}.")
+            raise ApplicationError(f"Couldn't find AppleBooks database @ {path}.", self.app)
 
     def _execute_query(self, sqlite_file, query) -> list:
 
@@ -443,7 +441,7 @@ class ConnectToAppleBooksDB:
             connection.row_factory = self._dict_factory
             return connection
         except sqlite3.Error as error:
-            raise Exception(repr(error))
+            raise ApplicationError(f"SQLite Error: {repr(error)}", self.app)
 
         return None
 

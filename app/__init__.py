@@ -6,13 +6,15 @@ from datetime import datetime
 from .defaults import AppDefaults
 from .applebooks import AppleBooks
 from .api import ApiConnect
-from .tools import OSTools, print_progress_bar
+from .utilities import Utilities
+from .errors import ApplicationError
 # from .testing import generate_dummy_annotations
 
 
 """
-NOTE: The places we need to focus on are mainly the API and this app. We should
-try and get clear communication and feedback between the two endpoints.
+NOTE: The places we need to focus on are mainly the hlts.api, hlts.data this
+app. We should try and get clear communication and feedback between the two
+endpoints.
 
 TODO: Implement your own standard API response. Like:
 
@@ -48,8 +50,7 @@ stick with one method?
 It seems that adding is way more efficent. Instead of deleting and re-adding
 all un-changed annotations, it simply skips it.
 
-TODO: Build custom exceptions. The ApiConnect > Post Exception handling is
-insane, we need better names so we understand exactly whats happening.
+TODO: Build custom exceptions.
 
 TODO: Test out concatenated annotation syntax!
 
@@ -57,12 +58,11 @@ heroku run flask erase_all_annotations --app hlts-dev
 """
 
 
-os = OSTools()
-
-
 class App:
 
     def __init__(self):
+
+        self.utils = Utilities(self)
 
         self._build_directories()
 
@@ -88,16 +88,16 @@ class App:
 
             self.applebooks.manage()
 
-            if self.confirm():
+            if self.user_confirm():
                 self.send_annotations()
                 self.display_api_response()
 
     def _build_directories(self):
 
         # Create app root_dir directory.
-        os.make_dir(path=AppDefaults.root_dir)
+        self.utils.make_dir(path=AppDefaults.root_dir)
 
-    def confirm(self):
+    def user_confirm(self):
         """ WIP """
 
         """
@@ -136,12 +136,12 @@ class App:
             number_of_chunks = len(chunked_data)
 
             print(f"Adding {len(data)} annotations...")
-            print_progress_bar(0, number_of_chunks)
+            self.utils.progress_bar(0, number_of_chunks)
 
             for count, chunk in enumerate(chunked_data):
 
                 self.api.post(chunk, "add")
-                print_progress_bar(count + 1, number_of_chunks)
+                self.utils.progress_bar(count + 1, number_of_chunks)
 
         """ Refresh annotations. """
 
@@ -154,12 +154,12 @@ class App:
             number_of_chunks = len(chunked_data)
 
             print(f"Refreshing {len(data)} annotations...")
-            print_progress_bar(0, number_of_chunks)
+            self.utils.progress_bar(0, number_of_chunks)
 
             for count, chunk in enumerate(chunked_data):
 
                 self.api.post(chunk, "refresh")
-                print_progress_bar(count + 1, number_of_chunks)
+                self.utils.progress_bar(count + 1, number_of_chunks)
 
     def display_api_response(self):
         """ WIP """
@@ -188,7 +188,7 @@ class Logger:
         except FileNotFoundError:
             self._create_new_log()
         except Exception as error:
-            raise Exception(f"Unexpected Error: {repr(error)}")
+            raise ApplicationError(f"Unexpected Error: {repr(error)}", self.app)
 
     def __repr__(self):
         return self._log
@@ -207,7 +207,7 @@ class Logger:
         except FileNotFoundError:
             self._create_new_log()
         except Exception as error:
-            raise Exception(f"Unexpected Error: {repr(error)}")
+            raise ApplicationError(f"Unexpected Error: {repr(error)}", self.app)
 
     def info(self, info):
         self._write_to_log(f"INFO: {info}")
@@ -243,7 +243,7 @@ class Config:
                     self._set_default_config()
                     self._save_config()
                 except Exception as error:
-                    raise Exception(f"Unexpected Error: {repr(error)}")
+                    raise ApplicationError(f"Unexpected Error: {repr(error)}", self.app)
         except json.JSONDecodeError as error:
             self._config_load_error(error)
             self._set_default_config()
@@ -252,7 +252,7 @@ class Config:
             self._set_default_config()
             self._save_config()
         except Exception as error:
-            raise Exception(f"Unexpected Error: {repr(error)}")
+            raise ApplicationError(f"Unexpected Error: {repr(error)}", self.app)
 
     def __repr__(self):
         return str(self._serialize())

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-import sys
 import json
 import requests
 
 from .defaults import ApiDefaults
+from .errors import ApplicationError, ApiConnectionError
 
 
 class ApiConnect:
@@ -47,11 +47,11 @@ class ApiConnect:
                 return True
 
         except requests.exceptions.HTTPError as http_error:
-            print(f"\nHTTP Error occurred: {http_error}")
+            raise ApiConnectionError(repr(http_error), self.app)
         except requests.exceptions.ConnectionError as connection_error:
-            print(f"\nConnection Error occured: {connection_error}")
+            raise ApiConnectionError(repr(connection_error), self.app)
         except Exception as unknown_error:
-            print(f"\nUnknown Error occurred: {unknown_error}")
+            raise ApiConnectionError(repr(unknown_error), self.app)
 
         return False
 
@@ -65,7 +65,7 @@ class ApiConnect:
             url = self.url_add
 
         else:
-            raise Exception("Unrecognized API import method.")
+            raise ApplicationError("Unrecognized API import method.", self.app)
 
         data = json.dumps(data)
 
@@ -80,16 +80,11 @@ class ApiConnect:
             self._response.append(message)
 
         except requests.exceptions.HTTPError as http_error:
-            print(f"\nHTTP Error occurred: {http_error}")
-            sys.exit(-1)
-
+            ApiConnectionError(repr(http_error), self.app)
         except requests.exceptions.ConnectionError as connection_error:
-            print(f"\nConnection Error occured: {connection_error}")
-            sys.exit(-1)
-
+            ApiConnectionError(repr(connection_error), self.app)
         except Exception as unknown_error:
-            print(f"\nUnknown Error occurred: {unknown_error}")
-            sys.exit(-1)
+            ApiConnectionError(repr(unknown_error), self.app)
 
     @property
     def response(self):
