@@ -8,7 +8,7 @@ from .applebooks import AppleBooks
 from .api import ApiConnect
 from .utilities import Utilities
 from .errors import ApplicationError
-# from .testing import generate_dummy_annotations
+from .testing import dummy_annotations
 
 
 """
@@ -16,39 +16,9 @@ NOTE: The places we need to focus on are mainly the hlts.api, hlts.data this
 app. We should try and get clear communication and feedback between the two
 endpoints.
 
-TODO: Implement your own standard API response. Like:
-
-    {
-        "success": true,
-        "payload": {
-            /* Application-specific data would go here. */
-        }
-    }
-
-    {
-        "success": false,
-        "payload": {
-            /* Application-specific data would go here. */
-        },
-        "error": {
-            "code": 123,
-            "message": "An error occurred!"
-        }
-    }
-
-Or Like: https://github.com/omniti-labs/jsend
-
 TODO: Add a way to append a temporary collection to the import. Anything that
 is refreshed or added will get in a way "collection stamped" so you can see what
 was added or refreshed today. "added-10121990" or "refreshed-10121990"
-
-QUESTION: Do we NEED an `add` *and* a `refresh` method? Could we just make it
-only one method? What are the situations where it would be advantaeous to use
-both. Doesn't the fact that we have a `protected` attribute allow us to just
-stick with one method?
-
-It seems that adding is way more efficent. Instead of deleting and re-adding
-all un-changed annotations, it simply skips it.
 
 TODO: Build custom exceptions.
 
@@ -60,8 +30,9 @@ heroku run flask erase_all_annotations --app hlts-dev
 
 class App:
 
-    def __init__(self):
+    def __init__(self, debug=False):
 
+        self.debug = debug
         self.utils = Utilities(self)
 
         self._build_directories()
@@ -86,11 +57,19 @@ class App:
 
         if self.api.verify_key():
 
-            self.applebooks.manage()
+            if self.debug:
+                self._adding_annotations = dummy_annotations(
+                    count=50, id_prefix="TEST1-adding", passage="Inital run.")
+                self._refreshing_annotations = dummy_annotations(
+                    count=50, id_prefix="TEST1-refreshing", passage="Inital run.")
+            else:
+                self.applebooks.manage()
+                self._adding_annotations = self.applebooks.adding_annotations
+                self._refreshing_annotations = self.applebooks.refreshing_annotations
 
             if self.user_confirm():
-                self.send_annotations()
-                self.display_api_response()
+                self.handle_api_import()
+                self.handle_api_response()
 
     def _build_directories(self):
 
@@ -98,19 +77,10 @@ class App:
         self.utils.make_dir(path=AppDefaults.root_dir)
 
     def user_confirm(self):
-        """ WIP """
-
+        """ WIP: Placeholder function to handle user confirmation.
         """
-        TESTING
-        data_a = generate_dummy_annotations(count=50, id_prefix="TEST3")
-        data_r = generate_dummy_annotations(count=25, id_prefix="TEST3")
-
-        print(f"Found {len(data_a)} annotation to add.")
-        print(f"Found {len(data_r)} annotation to refresh.")
-        """
-
-        num_add = self.applebooks.metadata["count"]["add"]
-        num_refresh = self.applebooks.metadata["count"]["refresh"]
+        num_add = len(self._adding_annotations)
+        num_refresh = len(self._refreshing_annotations)
 
         confirm = input(f"\nConfirm to add:{num_add} refresh:{num_refresh} annotations? [y/N]: ")
 
@@ -120,60 +90,48 @@ class App:
 
         return True
 
-    def send_annotations(self):
-        """ WIP """
-        """ TODO: Clean and dry this code out. Maybe compact it so that we have
-        only one progress bar? """
-
-        """ Add annotations. """
-
-        data = self.applebooks.adding_annotations
-        # data = generate_dummy_annotations(count=1, id_prefix="TEST3")
-
-        if data:
-
-            chunked_data = self._chunk_data(data)
-            number_of_chunks = len(chunked_data)
-
-            print(f"Adding {len(data)} annotations...")
-            self.utils.progress_bar(0, number_of_chunks)
-
-            for count, chunk in enumerate(chunked_data):
-
-                self.api.post(chunk, "add")
-                self.utils.progress_bar(count + 1, number_of_chunks)
-
-        """ Refresh annotations. """
-
-        data = self.applebooks.refreshing_annotations
-        # data = generate_dummy_annotations(count=10, id_prefix="TEST3")
-
-        if data:
-
-            chunked_data = self._chunk_data(data)
-            number_of_chunks = len(chunked_data)
-
-            print(f"Refreshing {len(data)} annotations...")
-            self.utils.progress_bar(0, number_of_chunks)
-
-            for count, chunk in enumerate(chunked_data):
-
-                self.api.post(chunk, "refresh")
-                self.utils.progress_bar(count + 1, number_of_chunks)
-
-    def display_api_response(self):
-        """ WIP """
-        print(self.api.response)
-        self.logger.info(self.api.response)
-
-    def _chunk_data(self, data: list, chunk_size=100):
-        """ Instead of sending a long list of annotations all at once, this
-        splits the list into a list of `chunk_size` lists. This helps prevent
-        Timeouts.
-
-        QUESTION: Should this be moved to .tools?
+    def handle_api_import(self):
+        """ TODO: Clean and DRY this code.
+        QUESTION: Maybe compact it so that we have only one progress bar?
         """
-        return [data[x:x + chunk_size] for x in range(0, len(data), chunk_size)]
+
+        # Add annotations.
+        if self._adding_annotations:
+
+            chunked_data = self.utils.chunk_data(self._adding_annotations)
+            number_of_chunks = len(chunked_data)
+
+            print(f"Adding {len(self._adding_annotations)} annotations...")
+            self.utils.print_progress(0, number_of_chunks)
+
+            for count, chunk in enumerate(chunked_data):
+
+                self.api.import_annotations(chunk, "add")
+                self.utils.print_progress(count + 1, number_of_chunks)
+
+        # Refresh annotations.
+        if self._refreshing_annotations:
+
+            chunked_data = self.utils.chunk_data(self._refreshing_annotations)
+            number_of_chunks = len(chunked_data)
+
+            print(f"Refreshing {len(self._refreshing_annotations)} annotations...")
+            self.utils.print_progress(0, number_of_chunks)
+
+            for count, chunk in enumerate(chunked_data):
+
+                self.api.import_annotations(chunk, "refresh")
+                self.utils.print_progress(count + 1, number_of_chunks)
+
+    def handle_api_response(self):
+        """ WIP: Placeholder function to handle API responses.
+        """
+        if self.api.had_failures:
+            self.logger.warning(self.api.import_failed)
+            print("WARNING: Encountered import failures. "
+                  "Please check logs for details.")
+
+        self.logger.info(self.api.import_succeeded)
 
 
 class Logger:
@@ -199,11 +157,13 @@ class Logger:
 
     def _write_to_log(self, message):
 
-        date = datetime.now().isoformat()
+        date = datetime.now().strftime("%Y-%m-%d @ %I:%M:%S %p")
+
+        message = f"{date} - {message}\n"
 
         try:
             with open(AppDefaults.log_file, "a") as f:
-                f.write(f"{date} - {message}\n")
+                f.write(message)
         except FileNotFoundError:
             self._create_new_log()
         except Exception as error:

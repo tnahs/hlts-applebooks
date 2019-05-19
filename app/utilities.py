@@ -45,6 +45,13 @@ class Utilities:
         except Exception as error:
             raise ApplicationError(repr(error), self.app)
 
+    def chunk_data(self, data: list, chunk_size=100):
+        """ Instead of sending a long list of annotations all at once, this
+        splits the list into a list of `chunk_size` lists. This helps prevent
+        Gateway Timeout (504) error.
+        """
+        return [data[x:x + chunk_size] for x in range(0, len(data), chunk_size)]
+
     def to_lowercase(self, input_: Union[list, str, dict]) -> Union[list, str, dict]:
 
         if type(input_) is str:
@@ -56,7 +63,7 @@ class Utilities:
         elif type(input_) is dict:
             return dict((k, v.lower()) for k, v in input_.items())
 
-    def progress_bar(self, current_iteration, total_iteration, max_bar=50):
+    def print_progress(self, current_iteration, total_iteration, max_bar=50):
         """ TODO: Clean how this is implemented inside of a loop.
 
         Call in a loop to create terminal progress bar.

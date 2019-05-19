@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 
-def generate_dummy_annotations(count, id_prefix=""):
+def dummy_annotations(count, id_prefix="", passage=""):
 
     data = []
 
@@ -10,7 +10,7 @@ def generate_dummy_annotations(count, id_prefix=""):
         data.append(
             {
                 "id": f"ID-{id_prefix}-{num}",
-                "passage": f"Testing {num}!",
+                "passage": f"Testing-{id_prefix}-{num} {passage}!",
                 "source": {
                     "name": "Testing Source",
                     "author": "Testing Author"

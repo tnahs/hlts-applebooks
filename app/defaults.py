@@ -5,7 +5,7 @@ from datetime import datetime
 
 
 HOME = Path.home()
-DATE = datetime.now().strftime("%Y%m%d")
+DATE = datetime.now().strftime("%Y-%m-%d")
 
 
 class AppDefaults:

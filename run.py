@@ -5,7 +5,7 @@ import sys
 from app import App
 
 
-app = App()
+app = App(debug=True)
 
 
 if __name__ == "__main__":

@@ -11,4 +11,4 @@ class ApplicationError(Exception):
 
 class ApiConnectionError(ApplicationError):
     def __init__(self, message, app=None):
-        super().__init__(app, message)
+        super().__init__(message, app)
