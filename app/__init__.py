@@ -12,6 +12,7 @@ from .testing import dummy_annotations
 
 
 """
+
 NOTE: The places we need to focus on are mainly the hlts.api, hlts.data this
 app. We should try and get clear communication and feedback between the two
 endpoints.
@@ -24,7 +25,7 @@ TODO: Build custom exceptions.
 
 TODO: Test out concatenated annotation syntax!
 
-heroku run flask erase_all_annotations --app hlts-dev
+NOTE: `heroku run flask erase_all_annotations --app hlts-dev`
 """
 
 
