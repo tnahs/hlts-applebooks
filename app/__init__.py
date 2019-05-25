@@ -17,6 +17,10 @@ NOTE: The places we need to focus on are mainly the hlts.api, hlts.data this
 app. We should try and get clear communication and feedback between the two
 endpoints.
 
+TODO: Add a function here that downloads user .htls files. If we see we are
+getting timeout errors. We can probably build a communication system thats similar
+to the chunking
+
 TODO: Add a way to append a temporary collection to the import. Anything that
 is refreshed or added will get in a way "collection stamped" so you can see what
 was added or refreshed today. "added-10121990" or "refreshed-10121990"
@@ -60,9 +64,9 @@ class App:
 
             if self.debug:
                 self._adding_annotations = dummy_annotations(
-                    count=50, id_prefix="TEST1-adding", passage="Inital run.")
+                    count=5000, id_prefix="TEST2-adding-10k", passage="Inital run.")
                 self._refreshing_annotations = dummy_annotations(
-                    count=50, id_prefix="TEST1-refreshing", passage="Inital run.")
+                    count=5000, id_prefix="TEST2-refreshing-10k", passage="Inital run.")
             else:
                 self.applebooks.manage()
                 self._adding_annotations = self.applebooks.adding_annotations
@@ -92,8 +96,14 @@ class App:
         return True
 
     def handle_api_import(self):
-        """ TODO: Clean and DRY this code.
+        """ TODO: Clean and DRY this code. We want to make this useable for
+        any kind of data thats being sent. We're gonna add kindle highlights to
+        this app so it needs to work with that too.
+
         QUESTION: Maybe compact it so that we have only one progress bar?
+
+        NOTE: This data chunking is a temporary fix until we get proper
+        background tasks running.
         """
 
         # Add annotations.
