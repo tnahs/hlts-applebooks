@@ -70,13 +70,11 @@ class App:
                     count=50, id_prefix="TEST0", passage="Inital run.")
 
             if self.args.reader == "applebooks":
-                print("Reader is AppleBooks.")
                 self.applebooks.manage()
                 self._adding_annotations = self.applebooks.adding_annotations
                 self._refreshing_annotations = self.applebooks.refreshing_annotations
 
             elif self.args.reader == "kindle":
-                print("Reader is Kindle.")
                 # self.kindle.manage()
                 self._adding_annotations = []
                 self._refreshing_annotations = []

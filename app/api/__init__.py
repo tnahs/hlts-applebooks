@@ -4,7 +4,7 @@ import json
 import requests
 
 from .defaults import ApiDefaults
-from .errors import ApplicationError, ApiConnectionError
+from .errors import ApiError
 
 
 class ApiConnect:
@@ -44,7 +44,7 @@ class ApiConnect:
             get = requests.get(self.url_verify, headers=self.headers)
             get.raise_for_status()
         except Exception as exception:
-            ApiConnectionError(repr(exception), self.app)
+            ApiError(repr(exception), self.app)
 
         # API key verified.
         if get.status_code == 200:
@@ -59,7 +59,7 @@ class ApiConnect:
         elif method == "add":
             url = self.url_add
         else:
-            raise ApplicationError("Unrecognized API import method.", self.app)
+            raise ApiError("Unrecognized API import method.", self.app)
 
         data = json.dumps(data)
 
@@ -67,13 +67,13 @@ class ApiConnect:
             post = requests.post(url, data=data, headers=self.headers)
             post.raise_for_status()
         except Exception as exception:
-            ApiConnectionError(repr(exception), self.app)
+            ApiError(repr(exception), self.app)
 
         response = post.json()
 
         if post.status_code != 201:
             error = response.get("error")
-            raise ApiConnectionError(error, self.app)
+            raise ApiError(error, self.app)
 
         data = response.get("data")
         import_failed = data.get("import_failed")

@@ -7,8 +7,3 @@ class ApplicationError(Exception):
 
         if app:
             app.logger.error(message)
-
-
-class ApiConnectionError(ApplicationError):
-    def __init__(self, message, app=None):
-        super().__init__(message, app)

@@ -10,6 +10,8 @@ README: This works! Although the API response isn't great. It doesn't seem to
 say when an annotation was added, just that it was "refreshed". Will be holding
 off on any api-related updates until hlts_v2 is up and running.
 
+NOTE: Only works with hlts v.1.1.0 beta
+
 To run with Books:
 - Close Books
 - Run: python3 run.py --setup
