@@ -394,21 +394,22 @@ class ConnectToAppleBooksDB:
 
         self.app = app
 
-        self.bklibrary_sqlite = self._get_sqlite(path=AppleBooksDefaults.local_bklibrary_dir)
-        self.aeannotation_sqlite = self._get_sqlite(path=AppleBooksDefaults.local_aeannotation_dir)
-
     def query_sources(self):
 
+        bklibrary_sqlite = self._get_sqlite(AppleBooksDefaults.local_bklibrary_dir)
+
         data = self._execute_query(
-            sqlite_file=self.bklibrary_sqlite,
+            sqlite_file=bklibrary_sqlite,
             query=AppleBooksDefaults.source_query)
 
         return data
 
     def query_annotations(self):
 
+        aeannotation_sqlite = self._get_sqlite(AppleBooksDefaults.local_aeannotation_dir)
+
         data = self._execute_query(
-            sqlite_file=self.aeannotation_sqlite,
+            sqlite_file=aeannotation_sqlite,
             query=AppleBooksDefaults.annotation_query)
 
         return data
@@ -426,7 +427,7 @@ class ConnectToAppleBooksDB:
 
     def _execute_query(self, sqlite_file, query) -> list:
 
-        connection = self._connect_to_db(sqlite_file=sqlite_file)
+        connection = self._connect_to_db(sqlite_file)
 
         with connection:
             cursor = connection.cursor()
