@@ -35,9 +35,10 @@ NOTE: `heroku run flask erase_all_annotations --app hlts-dev`
 
 class App:
 
-    def __init__(self, debug=False):
+    def __init__(self, args):
 
-        self.debug = debug
+        self.args = args
+
         self.utils = Utilities(self)
 
         self._build_directories()
@@ -62,15 +63,23 @@ class App:
 
         if self.api.verify_key():
 
-            if self.debug:
+            if self.args.reader == "dummy":
                 self._adding_annotations = dummy_annotations(
-                    count=5000, id_prefix="TEST2-adding-10k", passage="Inital run.")
+                    count=50, id_prefix="TEST0", passage="Inital run.")
                 self._refreshing_annotations = dummy_annotations(
-                    count=5000, id_prefix="TEST2-refreshing-10k", passage="Inital run.")
-            else:
+                    count=50, id_prefix="TEST0", passage="Inital run.")
+
+            if self.args.reader == "applebooks":
+                print("Reader is AppleBooks.")
                 self.applebooks.manage()
                 self._adding_annotations = self.applebooks.adding_annotations
                 self._refreshing_annotations = self.applebooks.refreshing_annotations
+
+            elif self.args.reader == "kindle":
+                print("Reader is Kindle.")
+                # self.kindle.manage()
+                self._adding_annotations = []
+                self._refreshing_annotations = []
 
             if self.user_confirm():
                 self.handle_api_import()
@@ -87,7 +96,7 @@ class App:
         num_add = len(self._adding_annotations)
         num_refresh = len(self._refreshing_annotations)
 
-        confirm = input(f"\nConfirm to add:{num_add} refresh:{num_refresh} annotations? [y/N]: ")
+        confirm = input(f"Confirm to add:{num_add} refresh:{num_refresh} annotations? [y/N]: ")
 
         if confirm.lower().strip() != "y":
             print("Confirmation cancelled.")
