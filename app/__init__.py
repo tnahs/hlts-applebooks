@@ -12,6 +12,11 @@ from .testing import dummy_annotations
 
 
 """
+TODO: Make a method for raw data backup. Have it dump to somewhere where we can
+easily retrieve it. Maybe have this attach to our backup script somehow?
+
+TODO: Add EpubCFI We might want to move to a source-centric model so we can
+sort things based on book/sources.
 
 NOTE: The places we need to focus on are mainly the hlts.api, hlts.data this
 app. We should try and get clear communication and feedback between the two
@@ -34,7 +39,6 @@ NOTE: `heroku run flask erase_all_annotations --app hlts-dev`
 
 
 class App:
-
     def __init__(self, args):
 
         self.args = args
@@ -65,9 +69,11 @@ class App:
 
             if self.args.reader == "dummy":
                 self._adding_annotations = dummy_annotations(
-                    count=50, id_prefix="TEST0", passage="Inital run.")
+                    count=50, id_prefix="TEST0", passage="Inital run."
+                )
                 self._refreshing_annotations = dummy_annotations(
-                    count=50, id_prefix="TEST0", passage="Inital run.")
+                    count=50, id_prefix="TEST0", passage="Inital run."
+                )
 
             if self.args.reader == "applebooks":
                 self.applebooks.manage()
@@ -94,7 +100,9 @@ class App:
         num_add = len(self._adding_annotations)
         num_refresh = len(self._refreshing_annotations)
 
-        confirm = input(f"Confirm to add:{num_add} refresh:{num_refresh} annotations? [y/N]: ")
+        confirm = input(
+            f"Confirm to add:{num_add} refresh:{num_refresh} annotations? [y/N]: "
+        )
 
         if confirm.lower().strip() != "y":
             print("Confirmation cancelled.")
@@ -146,14 +154,14 @@ class App:
         """
         if self.api.had_failures:
             self.logger.warning(self.api.import_failed)
-            print("WARNING: Encountered import failures. "
-                  "Please check logs for details.")
+            print(
+                "WARNING: Encountered import failures. Please check logs for details."
+            )
 
         self.logger.info(self.api.import_succeeded)
 
 
 class Logger:
-
     def __init__(self, app):
 
         self.app = app
@@ -198,7 +206,6 @@ class Logger:
 
 
 class Config:
-
     def __init__(self, app):
 
         self.app = app
@@ -258,11 +265,7 @@ class Config:
         self.prefix_tag = "#"
         self.prefix_collection = "@"
 
-        self.applebooks_collections = {
-            "add": "",
-            "refresh": "",
-            "ignore": "",
-        }
+        self.applebooks_collections = {"add": "", "refresh": "", "ignore": ""}
         self.applebooks_colors = {
             "underline": True,
             "green": True,
@@ -299,9 +302,9 @@ class Config:
                     "blue": self.applebooks_colors["blue"],
                     "yellow": self.applebooks_colors["yellow"],
                     "pink": self.applebooks_colors["pink"],
-                    "purple": self.applebooks_colors["purple"]
-                }
-            }
+                    "purple": self.applebooks_colors["purple"],
+                },
+            },
         }
 
         return _config

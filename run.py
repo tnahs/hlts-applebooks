@@ -22,13 +22,13 @@ To run with Books:
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("reader",
-                    choices=["dummy", "applebooks", "kindle"],
-                    nargs="?",
-                    help="Which reader to sync.")
-parser.add_argument("-s","--setup",
-                    action="store_true",
-                    help="Run initial setup.")
+parser.add_argument(
+    "reader",
+    choices=["dummy", "applebooks", "kindle"],
+    nargs="?",
+    help="Which reader to sync.",
+)
+parser.add_argument("-s", "--setup", action="store_true", help="Run initial setup.")
 
 args = parser.parse_args()
 
